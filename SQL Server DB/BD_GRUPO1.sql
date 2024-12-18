@@ -1,4 +1,3 @@
-
 CREATE DATABASE Grupo1;
 GO
 
@@ -90,7 +89,7 @@ CREATE TABLE HechosNetflix (
     TiempoReproducido DECIMAL(10,2),     
     IngresoMensual DECIMAL(10,2),        
 
-    PRIMARY KEY (Fecha, UserID, show_id),
+    PRIMARY KEY (UserID, show_id),
 
     FOREIGN KEY (UserID) REFERENCES Netflix_Userbase(UserID),
     FOREIGN KEY (show_id) REFERENCES netflix_titles(show_id),
@@ -98,3 +97,49 @@ CREATE TABLE HechosNetflix (
     FOREIGN KEY (DatosBursatilesId) REFERENCES DatosBursatiles(Id),
     FOREIGN KEY (AccionesNetflixId) REFERENCES AccionesNetflix(Id)
 );
+
+Drop table HechosNetflix
+
+
+--Actualizar fechas para pruebas
+UPDATE Netflix_Userbase
+SET JoinDate = '2020-07-01', LastPaymentDate = '2020-07-31'
+WHERE JoinDate IS NULL OR JoinDate > '2020-01-01';
+
+
+
+INSERT INTO HechosNetflix (Fecha, UserID, show_id, reviewId, DatosBursatilesId, AccionesNetflixId, Reproducciones, TiempoReproducido, IngresoMensual)
+SELECT 
+    db.Fecha,                               
+    nu.UserID,                                
+    nt.show_id,                             
+    nr.reviewId,                            
+    db.Id AS DatosBursatilesId,              
+    an.Id AS AccionesNetflixId,             
+    COUNT(nt.show_id) AS Reproducciones,      
+    SUM(0.5 * nu.MonthlyRevenue) AS TiempoReproducido,
+    nu.MonthlyRevenue AS IngresoMensual       
+FROM 
+    DatosBursatiles db
+LEFT JOIN 
+    AccionesNetflix an ON db.Fecha = an.Fecha 
+LEFT JOIN 
+    Netflix_Userbase nu ON db.Fecha BETWEEN nu.JoinDate AND nu.LastPaymentDate 
+LEFT JOIN 
+    Netflix_Reviews nr ON nr.at = db.Fecha 
+LEFT JOIN 
+    netflix_titles nt ON nr.reviewId IS NOT NULL
+GROUP BY 
+    db.Fecha, nu.UserID, nt.show_id, nr.reviewId, db.Id, an.Id, nu.MonthlyRevenue;
+
+
+--Métricas de la tabla hechos
+
+--Reproducciones por título y región
+SELECT N.Country, T.title, SUM(H.Reproducciones) AS TotalReproducciones
+FROM HechosNetflix H
+JOIN Netflix_Userbase N ON H.UserID = N.UserID
+JOIN netflix_titles T ON H.show_id = T.show_id
+GROUP BY N.Country, T.title;
+
+SELECT*FROM HechosNetflix;
